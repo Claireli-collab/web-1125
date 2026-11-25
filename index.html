@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>療癒系可愛時鐘 ✨</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Tone.js 用於生成可愛的互動音效 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- 引入 Google Fonts 圓體字型，增加可愛感 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'cute': ['"Fredoka"', '"Zen Maru Gothic"', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'float-delayed': 'float 6s ease-in-out 3s infinite',
+                        'blink': 'blink 4s infinite',
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'bounce-slow': 'bounce 3s infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+                            '50%': { transform: 'translateY(-15px) rotate(5deg)' },
+                        },
+                        blink: {
+                            '0%, 96%, 100%': { transform: 'scaleY(1)' },
+                            '98%': { transform: 'scaleY(0.1)' },
+                        },
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-cute min-h-screen w-full overflow-x-hidden transition-colors duration-700 flex flex-col items-center justify-center p-4 select-none relative" id="app-body">
+
+    <!-- 背景漂浮裝飾層 -->
+    <div id="bg-decorations" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
+
+    <!-- 主容器 -->
+    <main class="relative z-10 w-full max-w-md flex flex-col items-center gap-6">
+        
+        <!-- 頂部控制列：音效開關與時間格式切換 -->
+        <div class="w-full flex justify-between items-center px-2">
+            <button id="sound-toggle" class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md active:scale-95 transition-all text-sm font-bold text-gray-700 border-2 border-white">
+                <span id="sound-icon" class="text-lg">🔇</span>
+                <span id="sound-text">開啟滴答聲</span>
+            </button>
+
+            <button id="format-toggle" class="px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md active:scale-95 transition-all text-sm font-bold text-gray-700 border-2 border-white">
+                24H 制
+            </button>
+        </div>
+
+        <!-- 可愛時鐘主體 (包含耳朵與錶盤) -->
+        <div class="relative mt-6 group cursor-pointer" id="clock-container" title="點我摸摸頭！">
+            
+            <!-- 左耳朵 (貓耳/熊耳造型) -->
+            <div id="ear-left" class="absolute -top-7 left-7 sm:left-9 w-16 h-20 sm:w-20 sm:h-24 rounded-t-full -rotate-[22deg] transition-all duration-500 border-4 border-white shadow-md flex items-center justify-center overflow-hidden origin-bottom group-hover:-rotate-[28deg]">
+                <!-- 內耳 -->
+                <div id="inner-ear-left" class="w-9 h-12 sm:w-11 sm:h-14 rounded-t-full mt-3 transition-colors duration-500"></div>
+            </div>
+
+            <!-- 右耳朵 -->
+            <div id="ear-right" class="absolute -top-7 right-7 sm:right-9 w-16 h-20 sm:w-20 sm:h-24 rounded-t-full rotate-[22deg] transition-all duration-500 border-4 border-white shadow-md flex items-center justify-center overflow-hidden origin-bottom group-hover:rotate-[28deg]">
+                <!-- 內耳 -->
+                <div id="inner-ear-right" class="w-9 h-12 sm:w-11 sm:h-14 rounded-t-full mt-3 transition-colors duration-500"></div>
+            </div>
+
+            <!-- 錶盤外框 -->
+            <div id="clock-face" class="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full bg-white border-[10px] shadow-2xl flex items-center justify-center transition-all duration-500">
+                
+                <!-- 內圈柔和陰影裝飾 -->
+                <div class="absolute inset-2 rounded-full shadow-inner pointer-events-none border border-gray-100"></div>
+
+                <!-- 可愛小表情 (眼睛與腮紅) -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 mt-10">
+                    <div class="flex items-center gap-12 sm:gap-14">
+                        <!-- 左眼 -->
+                        <div class="relative flex flex-col items-center">
+                            <div id="eye-left" class="w-3.5 h-4 sm:w-4 sm:h-5 rounded-full animate-blink transition-colors duration-500 relative">
+                                <div class="w-1.5 h-1.5 bg-white rounded-full absolute top-1 left-1"></div>
+                            </div>
+                            <!-- 左腮紅 -->
+                            <div id="blush-left" class="w-6 h-3 rounded-full opacity-60 blur-[1px] mt-1.5 -ml-3 transition-colors duration-500"></div>
+                        </div>
+
+                        <!-- 可愛小嘴巴 -->
+                        <div id="mouth" class="text-sm font-black -mt-2 transition-colors duration-500">ω</div>
+
+                        <!-- 右眼 -->
+                        <div class="relative flex flex-col items-center">
+                            <div id="eye-right" class="w-3.5 h-4 sm:w-4 sm:h-5 rounded-full animate-blink transition-colors duration-500 relative">
+                                <div class="w-1.5 h-1.5 bg-white rounded-full absolute top-1 left-1"></div>
+                            </div>
+                            <!-- 右腮紅 -->
+                            <div id="blush-right" class="w-6 h-3 rounded-full opacity-60 blur-[1px] mt-1.5 -mr-3 transition-colors duration-500"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 刻度與數字容器 (由 JS 動態生成) -->
+                <div id="clock-markings" class="absolute inset-0 w-full h-full"></div>
+
+                <!-- 時針 -->
+                <div id="hour-hand" class="absolute bottom-1/2 left-1/2 w-2.5 sm:w-3 h-16 sm:h-20 -ml-[5px] sm:-ml-[6px] rounded-full origin-bottom shadow-sm z-20 transition-colors duration-500"></div>
+
+                <!-- 分針 -->
+                <div id="minute-hand" class="absolute bottom-1/2 left-1/2 w-2 h-24 sm:h-28 -ml-[4px] rounded-full origin-bottom shadow-sm z-20 transition-colors duration-500"></div>
+
+                <!-- 秒針 -->
+                <div id="second-hand" class="absolute bottom-1/2 left-1/2 w-1 h-28 sm:h-32 -ml-[2px] rounded-full origin-bottom z-30 transition-colors duration-500">
+                    <!-- 秒針尾端小愛心/圓點裝飾 -->
+                    <div id="second-tail" class="w-2.5 h-2.5 rounded-full absolute -bottom-3 -left-[3px] transition-colors duration-500"></div>
+                </div>
+
+                <!-- 中心點按鈕 (鼻頭造型) -->
+                <div id="center-dot" class="absolute w-5 h-4 rounded-full border-2 border-white shadow-md z-40 transition-colors duration-500"></div>
+            </div>
+
+            <!-- 互動愛心氣泡 (點擊時鐘時彈出) -->
+            <div id="love-bubble" class="absolute -top-4 right-0 bg-white px-3 py-1 rounded-full shadow-lg text-sm font-bold opacity-0 transform translate-y-2 transition-all duration-300 pointer-events-none z-50 border-2 border-pink-200 text-pink-500">
+                最喜歡你了！💖
+            </div>
+        </div>
+
+        <!-- 數位時間與日期卡片 -->
+        <div id="digital-card" class="w-full bg-white/85 backdrop-blur-md rounded-3xl p-5 shadow-xl border-4 border-white flex flex-col items-center justify-center transition-all duration-500">
+            <div class="flex items-baseline gap-2">
+                <span id="digital-time" class="text-4xl sm:text-5xl font-black tracking-wider transition-colors duration-500">12:00:00</span>
+                <span id="ampm-badge" class="hidden text-sm font-bold px-2.5 py-0.5 rounded-full text-white transition-colors duration-500">PM</span>
+            </div>
+            <div id="digital-date" class="mt-2 text-sm sm:text-base font-bold text-gray-500 flex items-center gap-2">
+                <span>2026年11月25日</span>
+                <span>•</span>
+                <span id="digital-weekday" class="px-2.5 py-0.5 rounded-full text-xs transition-colors duration-500">星期三</span>
+            </div>
+        </div>
+
+        <!-- 主題切換器 -->
+        <div class="w-full bg-white/75 backdrop-blur-sm rounded-3xl p-4 shadow-lg border-2 border-white">
+            <p class="text-center text-xs font-bold text-gray-500 mb-3 tracking-widest">✨ 選擇你的療癒主題 ✨</p>
+            <div class="grid grid-cols-4 gap-2 sm:gap-3" id="theme-buttons">
+                <!-- 主題按鈕由 JS 動態生成 -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        /**
+         * 療癒系可愛時鐘核心邏輯
+         * 包含：主題系統、類比與數位時間同步、Tone.js 互動音效、動態背景裝飾
+         */
+
+        // 1. 定義可愛主題配色方案
+        const themes = [
+            {
+                id: 'strawberry',
+                name: '草莓牛奶',
+                icon: '🍓',
+                bgClass: 'bg-gradient-to-br from-pink-100 via-rose-100 to-pink-200',
+                borderColor: '#FF8FA3',
+                earOuter: '#FFB3C1',
+                earInner: '#FF758F',
+                hourHand: '#FF4D6D',
+                minuteHand: '#FF758F',
+                secondHand: '#FFCCD5',
+                eyeColor: '#590D22',
+                blushColor: '#FF8FA3',
+                digitalText: '#C9184A',
+                badgeBg: '#FF758F',
+                weekdayBg: '#FFE5EC',
+                weekdayText: '#C9184A',
+                particles: ['🍓', '🌸', '💖', '☁️', '🎀']
+            },
+            {
+                id: 'matcha',
+                name: '抹茶布丁',
+                icon: '🍵',
+                bgClass: 'bg-gradient-to-br from-emerald-100 via-lime-100 to-teal-100',
+                borderColor: '#74C69D',
+                earOuter: '#95D5B2',
+                earInner: '#52B788',
+                hourHand: '#2D6A4F',
+                minuteHand: '#40916C',
+                secondHand: '#F4A261',
+                eyeColor: '#1B4332',
+                blushColor: '#F4A261',
+                digitalText: '#2D6A4F',
+                badgeBg: '#52B788',
+                weekdayBg: '#D8F3DC',
+                weekdayText: '#2D6A4F',
+                particles: ['🍃', '🍵', '🍮', '🌼', '🍀']
+            },
+            {
+                id: 'starry',
+                name: '星空小熊',
+                icon: '🌙',
+                bgClass: 'bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900',
+                borderColor: '#A78BFA',
+                earOuter: '#8B5CF6',
+                earInner: '#FBBF24',
+                hourHand: '#6D28D9',
+                minuteHand: '#8B5CF6',
+                secondHand: '#F59E0B',
+                eyeColor: '#4C1D95',
+                blushColor: '#F472B6',
+                digitalText: '#6D28D9',
+                badgeBg: '#8B5CF6',
+                weekdayBg: '#EDE9FE',
+                weekdayText: '#5B21B6',
+                particles: ['⭐', '🌙', '✨', '☁️', '🪐']
+            },
+            {
+                id: 'lemon',
+                name: '蜂蜜檸檬',
+                icon: '🍋',
+                bgClass: 'bg-gradient-to-br from-amber-100 via-yellow-100 to-orange-100',
+                borderColor: '#FBBF24',
+                earOuter: '#FCD34D',
+                earInner: '#F59E0B',
+                hourHand: '#D97706',
+                minuteHand: '#F59E0B',
+                secondHand: '#38BDF8',
+                eyeColor: '#78350F',
+                blushColor: '#FB923C',
+                digitalText: '#B45309',
+                badgeBg: '#F59E0B',
+                weekdayBg: '#FEF3C7',
+                weekdayText: '#B45309',
+                particles: ['🍋', '🍯', '🌻', '🐝', '✨']
+            }
+        ];
+
+        // 狀態變數
+        let currentTheme = themes[0];
+        let is24Hour = true;
+        let soundEnabled = false;
+        let lastSecond = -1;
+        let synth = null;
+        let chimeSynth = null;
+
+        // 互動語錄陣列
+        const loveMessages = [
+            "最喜歡你了！💖",
+            "今天也要加油喔！✨",
+            "記得喝水休息一下～🍵",
+            "呼嚕呼嚕...好舒服～🐱",
+            "你今天看起來超棒的！🌟",
+            "每一秒都陪著你！⏰"
+        ];
+
+        // DOM 元素快取
+        const bodyEl = document.getElementById('app-body');
+        const bgDecorationsEl = document.getElementById('bg-decorations');
+        const clockFaceEl = document.getElementById('clock-face');
+        const earLeftEl = document.getElementById('ear-left');
+        const earRightEl = document.getElementById('ear-right');
+        const innerEarLeftEl = document.getElementById('inner-ear-left');
+        const innerEarRightEl = document.getElementById('inner-ear-right');
+        const eyeLeftEl = document.getElementById('eye-left');
+        const eyeRightEl = document.getElementById('eye-right');
+        const blushLeftEl = document.getElementById('blush-left');
+        const blushRightEl = document.getElementById('blush-right');
+        const mouthEl = document.getElementById('mouth');
+        const hourHandEl = document.getElementById('hour-hand');
+        const minuteHandEl = document.getElementById('minute-hand');
+        const secondHandEl = document.getElementById('second-hand');
+        const secondTailEl = document.getElementById('second-tail');
+        const centerDotEl = document.getElementById('center-dot');
+        const digitalTimeEl = document.getElementById('digital-time');
+        const ampmBadgeEl = document.getElementById('ampm-badge');
+        const digitalDateEl = document.getElementById('digital-date');
+        const digitalWeekdayEl = document.getElementById('digital-weekday');
+        const markingsEl = document.getElementById('clock-markings');
+
+        /**
+         * 初始化 Tone.js 音效引擎
+         */
+        function initAudio() {
+            if (!synth) {
+                // 輕柔的木魚/水滴滴答聲
+                synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.02,
+                    octaves: 2,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -16; // 保持溫柔不刺耳
+
+                // 可愛的互動和弦音效
+                chimeSynth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.1, release: 0.5 }
+                }).toDestination();
+                chimeSynth.volume.value = -10;
+            }
+        }
+
+        /**
+         * 播放可愛互動音效
+         */
+        function playCuteChime() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const now = Tone.now();
+                chimeSynth.triggerAttackRelease("C5", "16n", now);
+                chimeSynth.triggerAttackRelease("E5", "16n", now + 0.08);
+                chimeSynth.triggerAttackRelease("G5", "8n", now + 0.16);
+            } catch (e) {
+                console.warn("Audio playback skipped:", e);
+            }
+        }
+
+        /**
+         * 生成錶盤刻度與可愛數字
+         */
+        function renderClockMarkings() {
+            markingsEl.innerHTML = '';
+            
+            for (let i = 1; i <= 12; i++) {
+                const angle = (i * 30 - 90) * (Math.PI / 180);
+                // 使用百分比定位以適應不同螢幕尺寸
+                const xPercent = 50 + 39 * Math.cos(angle);
+                const yPercent = 50 + 39 * Math.sin(angle);
+
+                const numEl = document.createElement('div');
+                numEl.className = 'absolute transform -translate-x-1/2 -translate-y-1/2 font-black text-base sm:text-lg transition-colors duration-500';
+                numEl.style.left = `${xPercent}%`;
+                numEl.style.top = `${yPercent}%`;
+                numEl.style.color = currentTheme.digitalText;
+                
+                // 主要整點 12, 3, 6, 9 放大並加上可愛小裝飾
+                if (i % 3 === 0) {
+                    numEl.classList.add('text-xl', 'sm:text-2xl');
+                    numEl.textContent = i;
+                } else {
+                    numEl.textContent = '•';
+                    numEl.classList.add('opacity-50');
+                }
+                markingsEl.appendChild(numEl);
+            }
+        }
+
+        /**
+         * 生成背景漂浮可愛元素
+         */
+        function renderBackgroundParticles() {
+            bgDecorationsEl.innerHTML = '';
+            const count = 15;
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                const emoji = currentTheme.particles[i % currentTheme.particles.length];
+                el.textContent = emoji;
+                el.className = `absolute text-2xl sm:text-3xl opacity-60 ${i % 2 === 0 ? 'animate-float' : 'animate-float-delayed'}`;
+                el.style.left = `${Math.random() * 95}%`;
+                el.style.top = `${Math.random() * 95}%`;
+                el.style.animationDelay = `${Math.random() * 5}s`;
+                el.style.fontSize = `${Math.random() * 16 + 18}px`;
+                bgDecorationsEl.appendChild(el);
+            }
+        }
+
+        /**
+         * 套用選擇的主題
+         */
+        function applyTheme(theme) {
+            currentTheme = theme;
+            
+            // 更新背景漸層
+            bodyEl.className = `font-cute min-h-screen w-full overflow-x-hidden transition-colors duration-700 flex flex-col items-center justify-center p-4 select-none relative ${theme.bgClass}`;
+            
+            // 更新錶盤與耳朵顏色
+            clockFaceEl.style.borderColor = theme.borderColor;
+            earLeftEl.style.backgroundColor = theme.earOuter;
+            earRightEl.style.backgroundColor = theme.earOuter;
+            innerEarLeftEl.style.backgroundColor = theme.earInner;
+            innerEarRightEl.style.backgroundColor = theme.earInner;
+            
+            // 更新表情顏色
+            eyeLeftEl.style.backgroundColor = theme.eyeColor;
+            eyeRightEl.style.backgroundColor = theme.eyeColor;
+            blushLeftEl.style.backgroundColor = theme.blushColor;
+            blushRightEl.style.backgroundColor = theme.blushColor;
+            mouthEl.style.color = theme.eyeColor;
+            
+            // 更新指針顏色
+            hourHandEl.style.backgroundColor = theme.hourHand;
+            minuteHandEl.style.backgroundColor = theme.minuteHand;
+            secondHandEl.style.backgroundColor = theme.secondHand;
+            secondTailEl.style.backgroundColor = theme.secondHand;
+            centerDotEl.style.backgroundColor = theme.earInner;
+            
+            // 更新數位面板顏色
+            digitalTimeEl.style.color = theme.digitalText;
+            ampmBadgeEl.style.backgroundColor = theme.badgeBg;
+            digitalWeekdayEl.style.backgroundColor = theme.weekdayBg;
+            digitalWeekdayEl.style.color = theme.weekdayText;
+
+            // 重新繪製刻度與背景漂浮物
+            renderClockMarkings();
+            renderBackgroundParticles();
+            updateThemeButtonsUI();
+        }
+
+        /**
+         * 生成並更新主題按鈕列
+         */
+        function renderThemeButtons() {
+            const container = document.getElementById('theme-buttons');
+            container.innerHTML = '';
+            
+            themes.forEach(theme => {
+                const btn = document.createElement('button');
+                btn.id = `btn-theme-${theme.id}`;
+                btn.className = 'flex flex-col items-center justify-center p-2 rounded-2xl bg-white shadow-sm hover:scale-105 active:scale-95 transition-all border-2 border-transparent';
+                btn.innerHTML = `
+                    <span class="text-xl sm:text-2xl mb-1">${theme.icon}</span>
+                    <span class="text-[11px] sm:text-xs font-bold text-gray-700">${theme.name}</span>
+                `;
+                btn.addEventListener('click', () => {
+                    applyTheme(theme);
+                    playCuteChime();
+                });
+                container.appendChild(btn);
+            });
+            updateThemeButtonsUI();
+        }
+
+        function updateThemeButtonsUI() {
+            themes.forEach(theme => {
+                const btn = document.getElementById(`btn-theme-${theme.id}`);
+                if (btn) {
+                    if (theme.id === currentTheme.id) {
+                        btn.style.borderColor = theme.borderColor;
+                        btn.classList.add('ring-2', 'ring-offset-1');
+                        btn.style.setProperty('--tw-ring-color', theme.borderColor);
+                    } else {
+                        btn.style.borderColor = 'transparent';
+                        btn.classList.remove('ring-2', 'ring-offset-1');
+                    }
+                }
+            });
+        }
+
+        /**
+         * 更新時鐘時間與指針角度
+         */
+        function updateClock() {
+            const now = new Date();
+            const milliseconds = now.getMilliseconds();
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes();
+            const hours = now.getHours();
+
+            // 播放每秒滴答聲
+            if (seconds !== lastSecond) {
+                lastSecond = seconds;
+                if (soundEnabled && synth) {
+                    try {
+                        // 偶數秒與奇數秒音高微調，營造真實「滴-答」感
+                        const note = seconds % 2 === 0 ? "G4" : "E4";
+                        synth.triggerAttackRelease(note, "32n");
+                    } catch (e) {}
+                }
+            }
+
+            // 計算平滑角度 (包含毫秒讓秒針更流暢)
+            const smoothSeconds = seconds + milliseconds / 1000;
+            const secondDeg = smoothSeconds * 6;
+            const minuteDeg = (minutes + seconds / 60) * 6;
+            const hourDeg = ((hours % 12) + minutes / 60) * 30;
+
+            secondHandEl.style.transform = `rotate(${secondDeg}deg)`;
+            minuteHandEl.style.transform = `rotate(${minuteDeg}deg)`;
+            hourHandEl.style.transform = `rotate(${hourDeg}deg)`;
+
+            // 更新數位時間
+            let displayHours = hours;
+            if (!is24Hour) {
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                ampmBadgeEl.textContent = ampm;
+                ampmBadgeEl.classList.remove('hidden');
+                displayHours = hours % 12;
+                displayHours = displayHours ? displayHours : 12; // 0點顯示為12
+            } else {
+                ampmBadgeEl.classList.add('hidden');
+            }
+
+            const strHours = String(displayHours).padStart(2, '0');
+            const strMinutes = String(minutes).padStart(2, '0');
+            const strSeconds = String(seconds).padStart(2, '0');
+            digitalTimeEl.textContent = `${strHours}:${strMinutes}:${strSeconds}`;
+
+            // 更新日期與星期
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const weekdayStr = weekdays[now.getDay()];
+
+            digitalDateEl.children[0].textContent = `${year}年${month}月${date}日`;
+            digitalWeekdayEl.textContent = weekdayStr;
+
+            requestAnimationFrame(updateClock);
+        }
+
+        // 事件監聽：音效開關
+        document.getElementById('sound-toggle').addEventListener('click', async () => {
+            if (!soundEnabled) {
+                await Tone.start();
+                initAudio();
+                soundEnabled = true;
+                document.getElementById('sound-icon').textContent = '🔊';
+                document.getElementById('sound-text').textContent = '滴答聲開啟中';
+                playCuteChime();
+            } else {
+                soundEnabled = false;
+                document.getElementById('sound-icon').textContent = '🔇';
+                document.getElementById('sound-text').textContent = '開啟滴答聲';
+            }
+        });
+
+        // 事件監聽：12/24 小時制切換
+        document.getElementById('format-toggle').addEventListener('click', (e) => {
+            is24Hour = !is24Hour;
+            e.target.textContent = is24Hour ? '24H 制' : '12H 制';
+            playCuteChime();
+        });
+
+        // 事件監聽：點擊時鐘本體互動（摸摸頭效果）
+        let bubbleTimeout;
+        document.getElementById('clock-container').addEventListener('click', () => {
+            playCuteChime();
+            
+            // 嘴巴變成開心笑臉
+            mouthEl.textContent = '▽';
+            
+            // 隨機顯示可愛語錄氣泡
+            const bubble = document.getElementById('love-bubble');
+            const randomMsg = loveMessages[Math.floor(Math.random() * loveMessages.length)];
+            bubble.textContent = randomMsg;
+            bubble.style.borderColor = currentTheme.borderColor;
+            bubble.style.color = currentTheme.digitalText;
+            
+            bubble.classList.remove('opacity-0', 'translate-y-2');
+            bubble.classList.add('opacity-100', '-translate-y-2');
+
+            // 錶盤輕微彈跳
+            clockFaceEl.classList.add('scale-105');
+            setTimeout(() => clockFaceEl.classList.remove('scale-105'), 200);
+
+            clearTimeout(bubbleTimeout);
+            bubbleTimeout = setTimeout(() => {
+                bubble.classList.remove('opacity-100', '-translate-y-2');
+                bubble.classList.add('opacity-0', 'translate-y-2');
+                mouthEl.textContent = 'ω';
+            }, 2200);
+        });
+
+        // 啟動應用程式
+        window.addEventListener('DOMContentLoaded', () => {
+            renderThemeButtons();
+            applyTheme(themes[0]);
+            requestAnimationFrame(updateClock);
+        });
+    </script>
+</body>
+</html>
