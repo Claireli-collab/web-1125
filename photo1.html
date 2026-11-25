@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖片九宮格展示</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Inter 與 Noto Sans TC 字體 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        /* 九宮格單一格子的過渡動畫 */
+        .grid-tile {
+            background-size: 300% 300%;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, border-radius 0.25s ease;
+        }
+        .grid-tile:hover {
+            transform: scale(1.03);
+            z-index: 10;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        /* 拼圖模式被選中時的樣式 */
+        .tile-selected {
+            outline: 3px solid #3b82f6;
+            outline-offset: -3px;
+            transform: scale(0.96) !important;
+            filter: brightness(1.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+
+    <!-- 主容器 -->
+    <main class="w-full max-w-2xl bg-slate-800/80 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-2xl p-6 sm:p-8">
+        
+        <!-- 標題與說明 -->
+        <header class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                圖片九宮格切割展示
+            </h1>
+            <p class="text-slate-400 text-sm sm:text-base mt-2" id="instruction-text">
+                點擊任意區塊可放大檢視，或切換至「拼圖模式」交換區塊位置
+            </p>
+        </header>
+
+        <!-- 控制列 -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6 bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50">
+            <!-- 間距調整滑桿 -->
+            <div class="flex items-center gap-3 flex-1 min-w-[200px]">
+                <label for="gap-slider" class="text-sm font-medium text-slate-300 whitespace-nowrap">
+                    格線間距：
+                </label>
+                <input 
+                    type="range" 
+                    id="gap-slider" 
+                    min="0" 
+                    max="16" 
+                    value="6" 
+                    class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                >
+                <span id="gap-value" class="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-blue-400 w-12 text-center">
+                    6px
+                </span>
+            </div>
+
+            <!-- 功能按鈕群組 -->
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button 
+                    id="shuffle-btn" 
+                    class="px-3.5 py-2 text-sm font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors cursor-pointer active:scale-95"
+                >
+                    打亂拼圖
+                </button>
+                <button 
+                    id="reset-btn" 
+                    class="px-3.5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95"
+                >
+                    還原原圖
+                </button>
+            </div>
+        </div>
+
+        <!-- 載入提示 / 錯誤訊息區塊 -->
+        <div id="status-banner" class="hidden mb-4 p-3 rounded-xl text-sm text-center font-medium"></div>
+
+        <!-- 九宮格容器 (維持圖片比例) -->
+        <div class="relative w-full max-w-md mx-auto">
+            <div 
+                id="grid-container" 
+                class="grid grid-cols-3 w-full aspect-square bg-slate-950/50 p-2 rounded-xl border border-slate-700/50 transition-all duration-200"
+                style="gap: 6px;"
+            >
+                <!-- 九宮格區塊將由 JavaScript 動態生成 -->
+            </div>
+        </div>
+
+        <!-- 底部資訊與檢視原圖按鈕 -->
+        <footer class="mt-6 pt-4 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+            <span id="mode-indicator" class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                目前狀態：完整原圖
+            </span>
+            <button 
+                id="preview-full-btn" 
+                class="text-blue-400 hover:text-blue-300 underline underline-offset-4 cursor-pointer"
+            >
+                檢視完整未切割原圖
+            </button>
+        </footer>
+    </main>
+
+    <!-- 單格放大 / 原圖預覽 Modal (取代 alert) -->
+    <div id="preview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-5 shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-3">
+                <h3 id="modal-title" class="text-lg font-semibold text-white">區塊預覽</h3>
+                <button id="close-modal-btn" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer">
+                    ✕
+                </button>
+            </div>
+            <div id="modal-content" class="w-full aspect-square rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">
+                <!-- 預覽內容 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 目標圖片網址與備用圖片
+            const PRIMARY_IMG_URL = 'https://i.postimg.cc/N03dbntC/3.jpg';
+            const FALLBACK_IMG_URL = 'https://placehold.co/900x900/1e293b/94a3b8?text=Image+Load+Error';
+            
+            let activeImageUrl = PRIMARY_IMG_URL;
+            let imageAspectRatio = 1; // 預設 1:1，圖片載入後自動偵測真實比例
+
+            // DOM 元素
+            const gridContainer = document.getElementById('grid-container');
+            const gapSlider = document.getElementById('gap-slider');
+            const gapValue = document.getElementById('gap-value');
+            const shuffleBtn = document.getElementById('shuffle-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const previewFullBtn = document.getElementById('preview-full-btn');
+            const statusBanner = document.getElementById('status-banner');
+            const modeIndicator = document.getElementById('mode-indicator');
+            const instructionText = document.getElementById('instruction-text');
+
+            // Modal 元素
+            const previewModal = document.getElementById('preview-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalContent = document.getElementById('modal-content');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+
+            // 狀態變數
+            let currentOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // 0~8 代表九宮格原始位置
+            let isPuzzleMode = false;
+            let selectedTileIndex = null;
+
+            /**
+             * 顯示狀態提示訊息
+             */
+            function showBanner(message, type = 'info') {
+                statusBanner.textContent = message;
+                statusBanner.classList.remove('hidden', 'bg-red-500/20', 'text-red-300', 'border-red-500/40', 'bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/40', 'border');
+                
+                if (type === 'error') {
+                    statusBanner.classList.add('bg-red-500/20', 'text-red-300', 'border', 'border-red-500/40');
+                } else if (type === 'success') {
+                    statusBanner.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border', 'border-emerald-500/40');
+                }
+                statusBanner.classList.remove('hidden');
+            }
+
+            /**
+             * 預載圖片以取得原始長寬比並處理錯誤
+             */
+            function loadImageAndInit() {
+                const img = new Image();
+                img.onload = () => {
+                    activeImageUrl = PRIMARY_IMG_URL;
+                    if (img.naturalWidth && img.naturalHeight) {
+                        imageAspectRatio = img.naturalWidth / img.naturalHeight;
+                        gridContainer.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+                    }
+                    renderGrid();
+                };
+                img.onerror = () => {
+                    activeImageUrl = FALLBACK_IMG_URL;
+                    showBanner('無法載入外部圖片，已自動切換為備用顯示圖。', 'error');
+                    renderGrid();
+                };
+                img.src = PRIMARY_IMG_URL;
+            }
+
+            /**
+             * 渲染九宮格畫面
+             */
+            function renderGrid() {
+                gridContainer.innerHTML = '';
+                const gapPx = parseInt(gapSlider.value, 10);
+                const borderRadius = gapPx > 0 ? '8px' : '0px';
+
+                currentOrder.forEach((originalPos, currentSlot) => {
+                    const tile = document.createElement('div');
+                    
+                    // 計算該區塊在 3x3 網格中的原始行列 (0, 1, 2)
+                    const col = originalPos % 3;
+                    const row = Math.floor(originalPos / 3);
+
+                    // 使用百分比定位背景圖片 (0%, 50%, 100%)
+                    const posX = col * 50;
+                    const posY = row * 50;
+
+                    tile.className = 'grid-tile relative w-full h-full cursor-pointer overflow-hidden bg-slate-800 select-none';
+                    tile.style.backgroundImage = `url("${activeImageUrl}")`;
+                    tile.style.backgroundPosition = `${posX}% ${posY}%`;
+                    tile.style.borderRadius = borderRadius;
+
+                    if (selectedTileIndex === currentSlot) {
+                        tile.classList.add('tile-selected');
+                    }
+
+                    // 角落編號提示標籤 (滑鼠懸停時顯示)
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute bottom-1.5 right-1.5 bg-black/60 text-white/90 text-[10px] font-mono px-1.5 py-0.5 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none';
+                    badge.textContent = `#${originalPos + 1}`;
+                    tile.appendChild(badge);
+
+                    // 點擊事件處理
+                    tile.addEventListener('click', () => handleTileClick(currentSlot, originalPos));
+
+                    gridContainer.appendChild(tile);
+                });
+
+                updateStatusUI();
+            }
+
+            /**
+             * 處理點擊九宮格區塊
+             */
+            function handleTileClick(currentSlot, originalPos) {
+                if (!isPuzzleMode) {
+                    // 一般模式：點擊放大檢視單一區塊
+                    openSingleTileModal(originalPos);
+                    return;
+                }
+
+                // 拼圖模式：點擊兩個區塊進行交換
+                if (selectedTileIndex === null) {
+                    selectedTileIndex = currentSlot;
+                    renderGrid();
+                } else if (selectedTileIndex === currentSlot) {
+                    // 取消選取
+                    selectedTileIndex = null;
+                    renderGrid();
+                } else {
+                    // 交換位置
+                    const temp = currentOrder[selectedTileIndex];
+                    currentOrder[selectedTileIndex] = currentOrder[currentSlot];
+                    currentOrder[currentSlot] = temp;
+                    selectedTileIndex = null;
+                    renderGrid();
+                    checkPuzzleSolved();
+                }
+            }
+
+            /**
+             * 檢查拼圖是否已還原
+             */
+            function checkPuzzleSolved() {
+                const isSolved = currentOrder.every((val, index) => val === index);
+                if (isSolved && isPuzzleMode) {
+                    isPuzzleMode = false;
+                    showBanner('恭喜！您已成功將九宮格拼圖還原！', 'success');
+                    updateStatusUI();
+                }
+            }
+
+            /**
+             * 更新狀態文字與指示燈
+             */
+            function updateStatusUI() {
+                if (isPuzzleMode) {
+                    modeIndicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>目前狀態：拼圖挑戰中`;
+                    instructionText.textContent = '請依序點擊兩個區塊以交換它們的位置，還原完整圖片！';
+                } else {
+                    modeIndicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span>目前狀態：完整原圖`;
+                    instructionText.textContent = '點擊任意區塊可單獨放大檢視，或點擊「打亂拼圖」開始互動';
+                }
+            }
+
+            /**
+             * 開啟單一區塊放大 Modal
+             */
+            function openSingleTileModal(originalPos) {
+                const col = originalPos % 3;
+                const row = Math.floor(originalPos / 3);
+                
+                modalTitle.textContent = `第 ${row + 1} 列，第 ${col + 1} 欄 (區塊 #${originalPos + 1})`;
+                modalContent.style.aspectRatio = `${imageAspectRatio}`;
+                modalContent.innerHTML = `
+                    <div class="w-full h-full" style="
+                        background-image: url('${activeImageUrl}');
+                        background-size: 300% 300%;
+                        background-position: ${col * 50}% ${row * 50}%;
+                    "></div>
+                `;
+                previewModal.classList.remove('hidden');
+                previewModal.classList.add('flex');
+            }
+
+            /**
+             * 開啟完整原圖 Modal
+             */
+            previewFullBtn.addEventListener('click', () => {
+                modalTitle.textContent = '完整原始圖片';
+                modalContent.style.aspectRatio = `${imageAspectRatio}`;
+                modalContent.innerHTML = `<img src="${activeImageUrl}" alt="完整原圖" class="w-full h-full object-contain">`;
+                previewModal.classList.remove('hidden');
+                previewModal.classList.add('flex');
+            });
+
+            // 關閉 Modal 事件
+            closeModalBtn.addEventListener('click', () => {
+                previewModal.classList.add('hidden');
+                previewModal.classList.remove('flex');
+            });
+            previewModal.addEventListener('click', (e) => {
+                if (e.target === previewModal) {
+                    previewModal.classList.add('hidden');
+                    previewModal.classList.remove('flex');
+                }
+            });
+
+            // 間距滑桿控制
+            gapSlider.addEventListener('input', (e) => {
+                const val = e.target.value;
+                gapValue.textContent = `${val}px`;
+                gridContainer.style.gap = `${val}px`;
+                
+                // 動態調整圓角
+                const tiles = document.querySelectorAll('.grid-tile');
+                tiles.forEach(tile => {
+                    tile.style.borderRadius = val > 0 ? '8px' : '0px';
+                });
+            });
+
+            // 打亂拼圖按鈕
+            shuffleBtn.addEventListener('click', () => {
+                statusBanner.classList.add('hidden');
+                isPuzzleMode = true;
+                selectedTileIndex = null;
+
+                // Fisher-Yates 洗牌演算法
+                do {
+                    for (let i = currentOrder.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [currentOrder[i], currentOrder[j]] = [currentOrder[j], currentOrder[i]];
+                    }
+                } while (currentOrder.every((val, idx) => val === idx)); // 確保不會剛好洗成原圖
+
+                // 若間距為 0，自動給予一點間距方便辨識拼圖區塊
+                if (parseInt(gapSlider.value, 10) === 0) {
+                    gapSlider.value = 4;
+                    gapValue.textContent = '4px';
+                    gridContainer.style.gap = '4px';
+                }
+
+                renderGrid();
+            });
+
+            // 還原原圖按鈕
+            resetBtn.addEventListener('click', () => {
+                statusBanner.classList.add('hidden');
+                isPuzzleMode = false;
+                selectedTileIndex = null;
+                currentOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                renderGrid();
+            });
+
+            // 啟動初始化
+            loadImageAndInit();
+        });
+    </script>
+</body>
+</html>
